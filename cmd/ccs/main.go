@@ -148,21 +148,45 @@ func handleInteractiveMode(cm *config.ConfigManager) {
 		fmt.Println()
 	}
 
-	// Build choices for prompt
+	// Build choices for prompt with index numbers
 	var items []string
-	for _, model := range models {
-		items = append(items, model.Name)
+	for i, model := range models {
+		items = append(items, fmt.Sprintf("%d. %s", i+1, model.Name))
+	}
+
+	// Set size to show more items (up to 15)
+	size := len(items)
+	if size > 15 {
+		size = 15
+	}
+
+	// Create custom templates for green selection
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}",
+		Active:   "\U0001F7E2 {{ . | green }}",  // Green arrow + green text for selected
+		Inactive: "  {{ . }}",
+		Selected: "\U0001F7E2 {{ . | green }}",  // Green text for confirmed selection
+		FuncMap: map[string]interface{}{
+			"green": func(text string) string {
+				return fmt.Sprintf("\033[32m%s\033[0m", text)
+			},
+			"faint": func(text string) string {
+				return fmt.Sprintf("\033[2m%s\033[0m", text)
+			},
+		},
 	}
 
 	prompt := promptui.Select{
-		Label: "请选择要切换的模型",
-		Items: items,
+		Label:     "请选择要切换的模型",
+		Items:     items,
+		Size:      size,
+		Templates: templates,
 	}
 
 	idx, _, err := prompt.Run()
 	if err != nil {
-		if strings.Contains(err.Error(), "interrupt") {
-			fmt.Println(yellow("取消操作"))
+		if strings.Contains(err.Error(), "interrupt") || err.Error() == "^C" {
+			fmt.Println(yellow("取消选择"))
 			return
 		}
 		fmt.Fprintf(os.Stderr, "%s %s\n", red("❌ 错误:"), err.Error())
